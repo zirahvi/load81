@@ -61,6 +61,7 @@ Drawing functions:
 * getpixel(x,y): return the red,gree,blue value of the specified pixel.
 * setpixel(x,y,r,g,b): draw a pixel at (x, y) with color (r, g, b)
 * sprite(file,x,y,[rotation],[antialiasing],[cx],[cy],[cw],[ch]): draw sprite at coordinates with the specified rotation (in degrees, default 0) and antialiasing (default false), and optional source/crop rectangle (cx, cy, cw, ch). Crop-rectangle only works without rotation (rotation = 0).
+* spritedim(file): return sprite dimensins (width, height)
 
 Control functions:
 

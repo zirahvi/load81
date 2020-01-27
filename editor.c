@@ -513,6 +513,47 @@ void editorMouseClicked(int x, int y, int button) {
     }
 }
 
+void editorStartOfLine(int smart)
+{
+    int filerow = E.rowoff+E.cy;
+    int filecol = E.coloff+E.cx;
+    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+
+    if (filecol > 0) {
+        /* Move to start of line */
+        E.cx = 0;
+        E.coloff = 0;
+    } else if (smart) {
+        /* If already at the stat, move the cursor to first non-whitespace */
+        while (row && E.cx < row->size && isspace(row->chars[E.cx]))
+            E.cx++;
+        /* And then adjust column accordingly, to keep cursor visible */
+        if (E.cx >= E.screencols) {
+            E.coloff = E.cx - E.screencols + 1;
+            E.cx -= E.coloff;
+        }
+    }
+}
+
+#define max(a,b) ((a) > (b) ? (a) : (b))
+
+void editorEndOfLine(int smart)
+{
+    int filerow = E.rowoff+E.cy;
+    int filecol = E.coloff+E.cx;
+    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+
+    if (row) {
+        if (filecol < row->size) {
+            E.cx = row->size;
+        } else if (smart) {
+            E.cx = max(0, row->size - 1);
+        }
+        E.coloff = max(0, E.cx - E.screencols + 1);
+        E.cx -= E.coloff;
+    }
+}
+
 void editorMoveCursor(int key) {
     int filerow = E.rowoff+E.cy;
     int filecol = E.coloff+E.cx;
@@ -636,7 +677,6 @@ int editorEvents(void) {
             case SDLK_RETURN:
                 editorInsertNewline();
                 break;
-            case SDLK_HOME:
             case SDLK_LSHIFT:
             case SDLK_RSHIFT:
             case SDLK_LCTRL:
@@ -648,6 +688,23 @@ int editorEvents(void) {
             case SDLK_CAPSLOCK:
             case SDLK_MODE:
                 /* Ignored */
+                break;
+            case SDLK_RSUPER:
+            case SDLK_LSUPER:
+            case SDLK_COMPOSE:
+                break;
+            case SDLK_HOME:
+                editorStartOfLine(1);
+                break;
+            case SDLK_END:
+                editorEndOfLine(1);
+                break;
+            case SDLK_PAGEUP:
+            case SDLK_PAGEDOWN:
+                break;
+            case SDLK_INSERT:
+                break;
+            case SDLK_DELETE:
                 break;
             case SDLK_TAB:
                 for (i = 0; i < 4; i++)

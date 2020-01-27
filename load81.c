@@ -239,6 +239,7 @@ int getpixelBinding(lua_State *L) {
 #else
             pixel = p[2]|p[1]<<8|p[0]<<16;
 #endif
+	    break;
         case 4: pixel = *(Uint32*)p; break;
         default: return 0; break;
         }

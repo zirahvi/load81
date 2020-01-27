@@ -1,6 +1,8 @@
 README
 ===
 
+NOTE! THIS IS A FORK OF ANTIREZ'S ORIGINAL LOAD81. 
+
 Load81 is an attempt at creating a Codea-inspired environment to teach
 children how to write Lua programs. It features a graphical programming
 environment and a Commodore-64 style integrated editor so that the programmer
@@ -57,7 +59,8 @@ Drawing functions:
 * text(x,y,string): print the specified text at x,y using a bitmap font.
 * triangle(x1,y1,x2,y2,x3,y3): draw a triangle with the specified vertex.
 * getpixel(x,y): return the red,gree,blue value of the specified pixel.
-* sprite(file,x,y,[rotation],[antialiasing]): draw sprite at coordinates with the specified rotation (in degrees, default 0) and antialiasing (default false).
+* setpixel(x,y,r,g,b): draw a pixel at (x, y) with color (r, g, b)
+* sprite(file,x,y,[rotation],[antialiasing],[cx],[cy],[cw],[ch]): draw sprite at coordinates with the specified rotation (in degrees, default 0) and antialiasing (default false), and optional source/crop rectangle (cx, cy, cw, ch). Crop-rectangle only works without rotation (rotation = 0).
 
 Control functions:
 
@@ -105,6 +108,11 @@ if a button is pressed use:
     if mouse.pressed['1'] then ...
 
 Mouse buttons are called '1', '2', '3', ... and so forth.
+
+EDITOR
+===
+
+Support for Home and End navigation added. Home jumps to beginning of line/first non-space character on line. End jumps to one character past end of line/to last character on line.
 
 LICENSE
 ===

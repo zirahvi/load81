@@ -253,9 +253,66 @@ int getpixelBinding(lua_State *L) {
     return 3;
 }
 
+int setpixelBinding(lua_State *L) {
+    Uint32 pixel;
+    Uint8 r, g, b;
+    int x, y;
+
+    /* [0, WIDHT), [0, HEIGHT) */
+    x = lua_tonumber(L, 1);
+    y = l81.fb->height - 1 - lua_tonumber(L, 2);
+    /* [0, 255] */ 
+    r = lua_tonumber(L, 3);
+    g = lua_tonumber(L, 4);
+    b = lua_tonumber(L, 5);
+
+    SDL_LockSurface(l81.fb->screen);
+    if (x < 0 || x >= l81.fb->width || y < 0 || y >= l81.fb->height) {
+        ;
+    } else {
+        int bpp;
+        unsigned char *p;
+
+	pixel = SDL_MapRGB(l81.fb->screen->format, r, g, b);
+        
+	bpp = l81.fb->screen->format->BytesPerPixel;
+        p = ((unsigned char*) l81.fb->screen->pixels)+
+                             (y*l81.fb->screen->pitch)+(x*bpp);
+        
+	switch(bpp) {
+        case 1: 
+		*p = (Uint8) pixel; 
+		break;
+	case 2: 
+		*(Uint16*) p = (Uint16) pixel; 
+		break;
+        case 3:
+#if SDL_BYTEORDER == SDL_LIL_ENDIAN
+		p[2] = (pixel >> 16) & 255;
+		p[1] = (pixel >> 8)  & 255;
+		p[0] = pixel         & 255;
+#else
+		p[0] = (pixel >> 16) & 255;
+		p[1] = (pixel >> 8)  & 255;
+		p[2] = pixel         & 255;
+#endif
+		break;
+        case 4: 
+		*(Uint32*)p = pixel; 
+		break;
+        default:
+		return 0; 
+		break;
+        }
+    }
+    SDL_UnlockSurface(l81.fb->screen);
+    return 0;
+}
+
 int spriteBinding(lua_State *L) {
     const char *filename;
     int x, y, angle, antialiasing;
+    int cx, cy, cw, ch;
     void *sprite;
 
     filename = lua_tostring(L, 1);
@@ -263,9 +320,28 @@ int spriteBinding(lua_State *L) {
     y = lua_tonumber(L, 3);
     angle = luaL_optnumber(L,4,0);
     antialiasing = lua_toboolean(L,5);
+    cx = luaL_optnumber(L, 6, 0);
+    cy = luaL_optnumber(L, 7, 0);
+    cw = luaL_optnumber(L, 8, -1);
+    ch = luaL_optnumber(L, 9, -1);
     sprite = spriteLoad(L,filename);
-    spriteBlit(l81.fb, sprite, x, y, angle, antialiasing);
+    spriteBlit(l81.fb, sprite, x, y, angle, antialiasing, cx, cy, cw, ch);
     return 1;
+}
+
+int spritedimBinding(lua_State *L)
+{
+    const char* filename;
+    int width, height;
+    void* sprite;
+
+    filename = lua_tostring(L, 1);
+    sprite = spriteLoad(L, filename);
+    spriteDim(L, sprite, &width, &height);
+
+    lua_pushnumber(L, width);
+    lua_pushnumber(L, height);
+    return 2;
 }
 
 /* ========================== Events processing ============================= */
@@ -492,8 +568,12 @@ void resetProgram(void) {
     lua_setglobal(l81.L,"setFPS");
     lua_pushcfunction(l81.L,getpixelBinding);
     lua_setglobal(l81.L,"getpixel");
+    lua_pushcfunction(l81.L,setpixelBinding);
+    lua_setglobal(l81.L,"setpixel");
     lua_pushcfunction(l81.L,spriteBinding);
     lua_setglobal(l81.L,"sprite");
+    lua_pushcfunction(l81.L,spritedimBinding);
+    lua_setglobal(l81.L,"spritedim");
 
     initSpriteEngine(l81.L);
 

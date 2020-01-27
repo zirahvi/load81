@@ -105,12 +105,20 @@ void bfWriteString(frameBuffer *fb, int xp, int yp, const char *s, int len, int 
  * the same interface with load81.c. */
 #define SPRITE_MT "l81.sprite_mt"
 
-void spriteBlit(frameBuffer *fb, void *sprite, int x, int y, int angle, int aa) {
+void spriteBlit(frameBuffer *fb, void *sprite, int x, int y, int angle, int aa, int cx, int cy, int cw, int ch)
+{
     SDL_Surface *s = sprite;
+
     if (s == NULL) return;
+    
+    SDL_Rect src = {cx, cy, cw >= 0 ? cw : s->w, ch >= 0 ? ch : s->h};
+    int crop = (src.h != 0 || src.w != 0);
+    
     if (angle) s = rotozoomSurface(s,angle,1,aa);
-    SDL_Rect dst = {x, fb->height-1-y - s->h, s->w, s->h};
-    SDL_BlitSurface(s, NULL, fb->screen, &dst);
+    int dw = crop ? src.w : s->w;
+    int dh = crop ? src.h : s->h;
+    SDL_Rect dst = {x, fb->height-1-y - dh, dw, dh};
+    SDL_BlitSurface(s, crop ? &src : NULL, fb->screen, &dst);
     if (angle) SDL_FreeSurface(s);
 }
 
@@ -145,6 +153,19 @@ void *spriteLoad(lua_State *L, const char *filename) {
         pps = (SDL_Surface **)luaL_checkudata(L, -1, SPRITE_MT);
     }
     return *pps;
+}
+
+void spriteDim(lua_State* L, void* sprite, int* w, int *h)
+{
+    SDL_Surface *s = sprite;
+
+    if (!sprite) {
+        luaL_error(L, "Invalid sprite");
+        return;
+    }
+
+    if (w) *w = s->w;
+    if (h) *h = s->h;
 }
 
 int spriteGC(lua_State *L) {

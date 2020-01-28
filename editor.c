@@ -498,7 +498,7 @@ void editorMouseClicked(int x, int y, int button) {
         int filerow = E.rowoff+row;
         int filecol = E.coloff+col;
         erow *r = (filerow >= E.numrows) ? NULL : &E.row[filerow];
-    
+
         E.cblink = 0;
         if (filerow == E.numrows) {
             E.cx = 0;
@@ -536,6 +536,8 @@ void editorStartOfLine(int smart)
 }
 
 #define max(a,b) ((a) > (b) ? (a) : (b))
+#define min(a,b) ((a) < (b) ? (a) : (b))
+#define clamp(a,b,c) (max(min(a,c),b))
 
 void editorEndOfLine(int smart)
 {
@@ -557,19 +559,33 @@ void editorEndOfLine(int smart)
 void editorScroll(int lines)
 {
     int filerow = E.rowoff+E.cy;
-    int filecol = E.coloff+E.cx;
 
+    /* Scroll */
     filerow += lines;
+    filerow = clamp(filerow, 0, E.numrows-1);
 
-    /*if (filerow >= E.rowoff && filerow < E.rowoff + E.screenrows)*/
-
+    /* Adjust the view start and stop if needed */
     if (filerow < E.rowoff) {
         E.rowoff = filerow;
-    } else if (filerow >= E.rowoff + E.screenrows)
+    } else if (filerow >= E.rowoff + E.screenrows) {
+        E.rowoff = filerow - E.screenrows + 1;
+    }
+
+    /* Make sure column value stays below length of current line */
+    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+    if (row) {
+        int filecol = E.coloff + E.cx;
+        filecol = min(filecol, row->size);
+        E.cx = filecol - E.coloff;
+        /* Outside from left? */
+        if (E.cx < 0) {
+            E.coloff = max(0, E.coloff + E.cx);
+            E.cx = filecol - E.coloff;
+        }
+    }
     E.cy = filerow - E.rowoff;
 }
 
-void editorPageDown()
 void editorMoveCursor(int key) {
     int filerow = E.rowoff+E.cy;
     int filecol = E.coloff+E.cx;
@@ -716,7 +732,10 @@ int editorEvents(void) {
                 editorEndOfLine(1);
                 break;
             case SDLK_PAGEUP:
+                editorScroll(-5);
+                break;
             case SDLK_PAGEDOWN:
+                editorScroll(5);
                 break;
             case SDLK_INSERT:
                 break;
@@ -746,7 +765,7 @@ int editorEvents(void) {
 
 void editorSetError(const char *err, int line) {
     erow *row;
-    
+
     free(E.err);
     E.err = strdup(err);
     E.errline = line;

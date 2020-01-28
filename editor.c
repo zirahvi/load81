@@ -554,6 +554,22 @@ void editorEndOfLine(int smart)
     }
 }
 
+void editorScroll(int lines)
+{
+    int filerow = E.rowoff+E.cy;
+    int filecol = E.coloff+E.cx;
+
+    filerow += lines;
+
+    /*if (filerow >= E.rowoff && filerow < E.rowoff + E.screenrows)*/
+
+    if (filerow < E.rowoff) {
+        E.rowoff = filerow;
+    } else if (filerow >= E.rowoff + E.screenrows)
+    E.cy = filerow - E.rowoff;
+}
+
+void editorPageDown()
 void editorMoveCursor(int key) {
     int filerow = E.rowoff+E.cy;
     int filecol = E.coloff+E.cx;

@@ -231,8 +231,12 @@ int getpixelBinding(lua_State *L) {
         p = ((unsigned char*) l81.fb->screen->pixels)+
                              (y*l81.fb->screen->pitch)+(x*bpp);
         switch(bpp) {
-        case 1: pixel = *p; break;
-        case 2: pixel = *(Uint16 *)p; break;
+        case 1:
+            pixel = *p;
+            break;
+        case 2:
+            pixel = *(Uint16 *)p;
+            break;
         case 3:
 #if SDL_BYTEORDER == SDL_LIL_ENDIAN
             pixel = p[0]|p[1]<<8|p[2]<<16;
@@ -240,8 +244,12 @@ int getpixelBinding(lua_State *L) {
             pixel = p[2]|p[1]<<8|p[0]<<16;
 #endif
 	    break;
-        case 4: pixel = *(Uint32*)p; break;
-        default: return 0; break;
+        case 4:
+            pixel = *(Uint32*)p;
+            break;
+        default:
+            return 0;
+            break;
         }
     }
     SDL_GetRGB(pixel,l81.fb->screen->format,&r,&g,&b);
@@ -261,7 +269,7 @@ int setpixelBinding(lua_State *L) {
     /* [0, WIDHT), [0, HEIGHT) */
     x = lua_tonumber(L, 1);
     y = l81.fb->height - 1 - lua_tonumber(L, 2);
-    /* [0, 255] */ 
+    /* [0, 255] */
     r = lua_tonumber(L, 3);
     g = lua_tonumber(L, 4);
     b = lua_tonumber(L, 5);
@@ -273,36 +281,36 @@ int setpixelBinding(lua_State *L) {
         int bpp;
         unsigned char *p;
 
-	pixel = SDL_MapRGB(l81.fb->screen->format, r, g, b);
-        
-	bpp = l81.fb->screen->format->BytesPerPixel;
+        pixel = SDL_MapRGB(l81.fb->screen->format, r, g, b);
+
+        bpp = l81.fb->screen->format->BytesPerPixel;
         p = ((unsigned char*) l81.fb->screen->pixels)+
                              (y*l81.fb->screen->pitch)+(x*bpp);
-        
-	switch(bpp) {
-        case 1: 
-		*p = (Uint8) pixel; 
-		break;
-	case 2: 
-		*(Uint16*) p = (Uint16) pixel; 
-		break;
+
+        switch(bpp) {
+        case 1:
+            *p = (Uint8) pixel;
+            break;
+        case 2:
+            *(Uint16*) p = (Uint16) pixel;
+            break;
         case 3:
 #if SDL_BYTEORDER == SDL_LIL_ENDIAN
-		p[2] = (pixel >> 16) & 255;
-		p[1] = (pixel >> 8)  & 255;
-		p[0] = pixel         & 255;
+            p[2] = (pixel >> 16) & 255;
+            p[1] = (pixel >> 8)  & 255;
+            p[0] = pixel         & 255;
 #else
-		p[0] = (pixel >> 16) & 255;
-		p[1] = (pixel >> 8)  & 255;
-		p[2] = pixel         & 255;
+            p[0] = (pixel >> 16) & 255;
+            p[1] = (pixel >> 8)  & 255;
+            p[2] = pixel         & 255;
 #endif
-		break;
-        case 4: 
-		*(Uint32*)p = pixel; 
-		break;
+            break;
+        case 4:
+            *(Uint32*)p = pixel;
+            break;
         default:
-		return 0; 
-		break;
+            return 0;
+            break;
         }
     }
     SDL_UnlockSurface(l81.fb->screen);
@@ -643,7 +651,7 @@ int main(int argc, char **argv) {
     initConfig();
     parseOptions(argc,argv);
     initScreen();
-    initEditor(l81.fb,30,30,30,30);
+    initEditor(l81.fb,30,30,60,30);
     editorOpen(l81.filename);
     while(1) {
         resetProgram();

@@ -381,6 +381,63 @@ int editorSave(char *filename) {
     return 0;
 }
 
+/* =========================== Selection handling =========================== */
+
+#define max(a,b) ((a) > (b) ? (a) : (b))
+#define min(a,b) ((a) < (b) ? (a) : (b))
+#define clamp(a,b,c) (max(min(a,c),b))
+
+void clearSelection()
+{
+    E.sel.start.row = -1;
+    E.sel.start.col = -1;
+    E.sel.end.row = -1;
+    E.sel.end.col = -1;
+}
+
+int noneSelected()
+{
+    return E.sel.start.row == -1 && E.sel.end.row == -1;
+}
+
+int inSelection(int cx, int cy)
+{
+    if (cy > E.sel.start.row && cy < E.sel.end.row) return 1;
+    if (cy == E.sel.start.row && cx >= E.sel.start.col) return 1;
+    if (cy == E.sel.end.row && cx <= E.sel.end.col) return 1;
+    return 0;
+}
+
+void updateSelection()
+{
+    int filerow, filecol;
+
+    filerow = E.cy + E.rowoff;
+    filecol = E.cx + E.coloff;
+
+    if (E.modifiers & E_MOD_SHIFT) {
+        /* If selection was empty, select current character */
+        if (noneSelected()) {
+            E.sel.start.row = filerow;
+            E.sel.start.col = filecol;
+            E.sel.end = E.sel.start;
+        } else {
+            /* Expand the selection */
+            if (filerow < E.sel.start.row) {
+                E.sel.start.row = filerow;
+                E.sel.start.col = filecol;
+            } else if (filerow > E.sel.end.row) {
+                E.sel.end.row = filerow;
+                E.sel.end.col = filecol;
+            }
+        }
+    } else {
+        clearSelection();
+    }
+    printf("sel: %d, %d -> %d, %d\n", E.sel.start.row, E.sel.start.col,
+           E.sel.end.row, E.sel.end.col);
+}
+
 /* ============================= Editor drawing ============================= */
 
 void editorDrawCursor(void) {
@@ -409,18 +466,24 @@ void editorDrawChars(void) {
         chary -= E.margin_top;
         r = &E.row[filerow];
 
-        snprintf(buf,sizeof(buf),"%d",filerow%1000);
+        snprintf(buf,sizeof(buf),"%5d",filerow%1000);
         bfWriteString(E.fb,0,chary,buf,strlen(buf),120,120,120,255);
 
         for (x = 0; x < E.screencols; x++) {
             int idx = x+E.coloff;
             int charx;
             hlcolor *color;
+            int selected = inSelection(filerow, idx);
 
             if (idx >= r->size) break;
             charx = x*FONT_KERNING;
             charx += E.margin_left;
             color = hlscheme+r->hl[idx];
+            if (selected) {
+                int charmargin = (FONT_WIDTH-FONT_KERNING)/2;
+                drawBox(E.fb, charx, chary, charx+charmargin+FONT_KERNING-1,chary+FONT_HEIGHT-1,
+                        255, 255, 255, 128);
+            }
             bfWriteChar(E.fb,charx,chary,r->chars[idx],
                         color->r,color->g,color->b,255);
         }
@@ -448,7 +511,8 @@ void editorDraw() {
             E.margin_left,
             E.margin_bottom,
             E.fb->width-1-E.margin_right,
-            E.fb->height-1-E.margin_top,66,66,231,255);
+            /* 66,66,231*/
+            E.fb->height-1-E.margin_top,51,51,102,255);
     editorDrawChars();
     editorDrawCursor();
     /* Show buttons */
@@ -480,36 +544,56 @@ int pressed_or_repeated(int counter) {
     return ((counter+period-1) % period) == 0;
 }
 
-void editorMouseClicked(int x, int y, int button) {
-    if (abs(x-POWEROFF_BUTTON_X) < 15 && abs(y-POWEROFF_BUTTON_Y) < 15 &&
-        button == 1)
-    {
+int powerButtonHit(int x, int y)
+{
+    return abs(x-POWEROFF_BUTTON_X) < 15 && abs(y-POWEROFF_BUTTON_Y) < 15;
+}
+
+int saveButtonHit(int x, int y)
+{
+    return abs(x-SAVE_BUTTON_X) < 15 && abs(y-SAVE_BUTTON_Y) < 15;
+}
+
+int editorAreaHit(int x, int y)
+{
+    return x >= E.margin_left && x <= E.fb->width-1-E.margin_right &&
+           y >= E.margin_bottom && y <= E.fb->height-1-E.margin_top;
+}
+
+void mouseCoordsToEditorCoords(int x, int y, int* cx, int* cy)
+{
+    int editor_height = E.fb->height - E.margin_top - E.margin_bottom;
+    int editor_y = y - E.margin_bottom;
+    int editor_x = x - E.margin_left;
+    *cy = (editor_height - editor_y) / FONT_HEIGHT;
+    *cx = editor_x/FONT_KERNING;
+}
+
+void editorMouseClicked(int x, int y, int button)
+{
+    if (button != 1) return;
+
+    if (powerButtonHit(x, y)) {
         exit(1);
-    } else if (abs(x-SAVE_BUTTON_X) < 15 && abs(y-SAVE_BUTTON_Y) < 15 &&
-               button == 1) {
+    } else if (saveButtonHit(x, y)) {
         if (editorSave(E.filename) == 0) E.dirty = 0;
-    } else if (x >= E.margin_left && x <= E.fb->width-1-E.margin_right &&
-               y >= E.margin_bottom && y <= E.fb->height-1-E.margin_top)
-    {
-        int realheight = E.fb->height - E.margin_top - E.margin_bottom;
-        int realy = y - E.margin_bottom;
-        int row = (realheight-realy)/FONT_HEIGHT;
-        int col = (x-E.margin_left)/FONT_KERNING;
-        int filerow = E.rowoff+row;
+    } else if (editorAreaHit(x, y)) {
+        int row, col;
+        mouseCoordsToEditorCoords(x, y, &col, &row);
+
+        int filerow = min(E.rowoff+row, E.numrows);
         int filecol = E.coloff+col;
         erow *r = (filerow >= E.numrows) ? NULL : &E.row[filerow];
 
         E.cblink = 0;
-        if (filerow == E.numrows) {
+        if (filerow >= E.numrows) {
             E.cx = 0;
-            E.cy = filerow-E.rowoff;
         } else if (r) {
-            if (filecol >= r->size)
-                E.cx = r->size-E.coloff;
-            else
-                E.cx = filecol-E.coloff;
-            E.cy = filerow-E.rowoff;
+            filecol = min(r->size, filecol);
+            E.cx = filecol - E.coloff;
         }
+        E.cy = filerow - E.rowoff;
+        updateSelection();
     }
 }
 
@@ -535,9 +619,6 @@ void editorStartOfLine(int smart)
     }
 }
 
-#define max(a,b) ((a) > (b) ? (a) : (b))
-#define min(a,b) ((a) < (b) ? (a) : (b))
-#define clamp(a,b,c) (max(min(a,c),b))
 
 void editorEndOfLine(int smart)
 {
@@ -656,6 +737,14 @@ int editorEvents(void) {
 
     while (SDL_PollEvent(&event)) {
         E.lastevent = time(NULL);
+
+        E.modifiers = 0;
+        if (event.key.keysym.mod) {
+            if (event.key.keysym.mod & KMOD_SHIFT) E.modifiers |= E_MOD_SHIFT;
+            if (event.key.keysym.mod & KMOD_CTRL) E.modifiers |= E_MOD_CONTROL;
+            if (event.key.keysym.mod & KMOD_ALT) E.modifiers |= E_MOD_ALT;
+        }
+
         switch(event.type) {
         /* Key pressed */
         case SDL_KEYDOWN:
@@ -686,6 +775,17 @@ int editorEvents(void) {
         case SDL_QUIT:
             exit(0);
             break;
+        }
+
+        if (event.type == SDL_KEYUP || event.type == SDL_KEYDOWN) {
+            if (E.key[SDLK_LSHIFT].counter || E.key[SDLK_RSHIFT].counter) {
+                E.modifiers |= E_MOD_SHIFT;
+            } else {
+                E.modifiers &= ~ E_MOD_SHIFT;
+            }
+
+            printf("%x ", E.modifiers);
+            fflush(stdout);
         }
     }
 
@@ -812,5 +912,6 @@ void initEditor(frameBuffer *fb, int mt, int mb, int ml, int mr) {
     E.screenrows = (fb->height-E.margin_top-E.margin_bottom) / FONT_HEIGHT;
     E.dirty = 0;
     E.filename = NULL;
+    clearSelection();
     memset(E.key,0,sizeof(E.key));
 }

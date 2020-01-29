@@ -43,6 +43,22 @@ typedef struct hlcolor {
     int r,g,b;
 } hlcolor;
 
+typedef struct cursor {
+    int row;
+    int col;
+} cursor;
+
+typedef struct region {
+    cursor start;
+    cursor end;
+} region;
+
+enum {
+    E_MOD_SHIFT = 1,
+    E_MOD_CONTROL = 2,
+    E_MOD_ALT = 4
+} keyModifiers;
+
 #define KEY_MAX 512 /* Latest key is excluded */
 struct editorConfig {
     int cx,cy;  /* Cursor x and y position in characters */
@@ -56,11 +72,13 @@ struct editorConfig {
     erow *row;      /* Rows */
     time_t lastevent;   /* Last event time, so we can go standby */
     keyState key[KEY_MAX];   /* Remember if a key is pressed / repeated. */
+    uint32_t modifiers; /* Modifiers */
     int dirty;      /* File modified but not saved. */
     char *filename; /* Currently open filename */
     frameBuffer *fb;    /* Framebuffer */
     char *err;          /* Error string to display, or NULL if no error. */
     int errline;        /* Error line to highlight if err != NULL. */
+    region sel; /* Selection */
 };
 
 /* ================================ Prototypes ============================== */

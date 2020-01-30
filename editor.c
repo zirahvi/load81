@@ -400,11 +400,31 @@ int noneSelected()
     return E.sel.start.row == -1 && E.sel.end.row == -1;
 }
 
+int editorGetSelection(region* sel)
+{
+    if (noneSelected()) return 0;
+
+    if (E.sel.start.row > E.sel.end.row ||
+        (E.sel.start.row == E.sel.end.row && E.sel.end.col < E.sel.start.col)) {
+        sel->start = E.sel.end;
+        sel->end = E.sel.start;
+        return 2;
+    } else {
+        sel->start = E.sel.start;
+        sel->end = E.sel.end;
+    }
+    return 1;
+}
+
 int inSelection(int cx, int cy)
 {
-    if (cy > E.sel.start.row && cy < E.sel.end.row) return 1;
-    if (cy == E.sel.start.row && cx >= E.sel.start.col) return 1;
-    if (cy == E.sel.end.row && cx <= E.sel.end.col) return 1;
+    if (E.sel.start.row == E.sel.end.row && cy == E.sel.start.row) {
+        return cx >= E.sel.start.col && cx <= E.sel.end.col;
+    } else {
+        if (cy > E.sel.start.row && cy < E.sel.end.row) return 1;
+        if (cy == E.sel.start.row && cx >= E.sel.start.col) return 1;
+        if (cy == E.sel.end.row && cx <= E.sel.end.col) return 1;
+    }
     return 0;
 }
 
@@ -415,24 +435,15 @@ void updateSelection()
     filerow = E.cy + E.rowoff;
     filecol = E.cx + E.coloff;
 
+    fflush(stdout);
+
     if (E.modifiers & E_MOD_SHIFT) {
-        /* If selection was empty, select current character */
-        if (noneSelected()) {
-            E.sel.start.row = filerow;
-            E.sel.start.col = filecol;
-            E.sel.end = E.sel.start;
-        } else {
-            /* Expand the selection */
-            if (filerow < E.sel.start.row) {
-                E.sel.start.row = filerow;
-                E.sel.start.col = filecol;
-            } else if (filerow > E.sel.end.row) {
-                E.sel.end.row = filerow;
-                E.sel.end.col = filecol;
-            }
-        }
+        E.sel.end.row = filerow;
+        E.sel.end.col = filecol;
     } else {
-        clearSelection();
+        E.sel.start.row = filerow;
+        E.sel.start.col = filecol;
+        E.sel.end = E.sel.start;
     }
     printf("sel: %d, %d -> %d, %d\n", E.sel.start.row, E.sel.start.col,
            E.sel.end.row, E.sel.end.col);
@@ -453,6 +464,52 @@ void editorDrawCursor(void) {
     E.cblink += 4;
 }
 
+void editorDrawSelectionBackground(int y)
+{
+    int start = -1, end = -1;
+    region sel = {};
+    erow* row = NULL;
+    int draw = 1;
+
+    int filerow = E.rowoff + y;
+    if (filerow >= E.numrows) return;
+
+    /* Get ordered selection */
+    if (!editorGetSelection(&sel)) return;
+
+    row = &E.row[filerow];
+
+    if (filerow > sel.start.row && filerow < sel.end.row) {
+        /* The whole line is fully contained in the selection */
+        start = 0;
+        end = row->size;
+    } else if (filerow == sel.start.row && filerow == sel.end.row) {
+        /* Single-line selection */
+        start = sel.start.col;
+        end = sel.end.col;
+    } else if (filerow == sel.start.row) {
+        /* First line of multi-line selection */
+        start = sel.start.col;
+        end = row->size;
+    } else if (filerow == sel.end.row) {
+        /* Last line of the same */
+        start = 0;
+        end = sel.end.col;
+    } else {
+        draw = 0;
+    }
+
+    if (draw) {
+        int charmargin = (FONT_WIDTH-FONT_KERNING)/2;
+        int left = E.margin_left + start * FONT_KERNING;
+        int top = E.fb->height - ((y+1)*FONT_HEIGHT) - E.margin_top;
+        int width = (end - start + 1) * FONT_KERNING + charmargin;
+        int height = FONT_HEIGHT;
+
+        drawBox(E.fb, left, top, left + width - 1, top + height -1, 255, 255, 255, 128);
+    }
+}
+
 void editorDrawChars(void) {
     int y,x;
     erow *r;
@@ -469,21 +526,18 @@ void editorDrawChars(void) {
         snprintf(buf,sizeof(buf),"%5d",filerow%1000);
         bfWriteString(E.fb,0,chary,buf,strlen(buf),120,120,120,255);
 
+        editorDrawSelectionBackground(y);
+
         for (x = 0; x < E.screencols; x++) {
             int idx = x+E.coloff;
             int charx;
             hlcolor *color;
-            int selected = inSelection(filerow, idx);
 
             if (idx >= r->size) break;
             charx = x*FONT_KERNING;
             charx += E.margin_left;
             color = hlscheme+r->hl[idx];
-            if (selected) {
-                int charmargin = (FONT_WIDTH-FONT_KERNING)/2;
-                drawBox(E.fb, charx, chary, charx+charmargin+FONT_KERNING-1,chary+FONT_HEIGHT-1,
-                        255, 255, 255, 128);
-            }
+
             bfWriteChar(E.fb,charx,chary,r->chars[idx],
                         color->r,color->g,color->b,255);
         }
@@ -617,6 +671,7 @@ void editorStartOfLine(int smart)
             E.cx -= E.coloff;
         }
     }
+    updateSelection();
 }
 
 
@@ -635,6 +690,7 @@ void editorEndOfLine(int smart)
         E.coloff = max(0, E.cx - E.screencols + 1);
         E.cx -= E.coloff;
     }
+    updateSelection();
 }
 
 void editorScroll(int lines)
@@ -665,6 +721,7 @@ void editorScroll(int lines)
         }
     }
     E.cy = filerow - E.rowoff;
+    updateSelection();
 }
 
 void editorMoveCursor(int key) {
@@ -719,6 +776,7 @@ void editorMoveCursor(int key) {
             E.cx = 0;
         }
     }
+    updateSelection();
 }
 
 int editorEvents(void) {
@@ -737,13 +795,14 @@ int editorEvents(void) {
 
     while (SDL_PollEvent(&event)) {
         E.lastevent = time(NULL);
-
+#if 0
         E.modifiers = 0;
         if (event.key.keysym.mod) {
             if (event.key.keysym.mod & KMOD_SHIFT) E.modifiers |= E_MOD_SHIFT;
             if (event.key.keysym.mod & KMOD_CTRL) E.modifiers |= E_MOD_CONTROL;
             if (event.key.keysym.mod & KMOD_ALT) E.modifiers |= E_MOD_ALT;
         }
+#endif
 
         switch(event.type) {
         /* Key pressed */
@@ -777,15 +836,13 @@ int editorEvents(void) {
             break;
         }
 
+        /* Handle modifiers */
         if (event.type == SDL_KEYUP || event.type == SDL_KEYDOWN) {
             if (E.key[SDLK_LSHIFT].counter || E.key[SDLK_RSHIFT].counter) {
                 E.modifiers |= E_MOD_SHIFT;
             } else {
                 E.modifiers &= ~ E_MOD_SHIFT;
             }
-
-            printf("%x ", E.modifiers);
-            fflush(stdout);
         }
     }
 

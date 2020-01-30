@@ -113,7 +113,11 @@ Mouse buttons are called '1', '2', '3', ... and so forth.
 EDITOR
 ===
 
+### 27 Jan 2020
 Support for Home and End navigation added. Home jumps to beginning of line/first non-space character on line. End jumps to one character past end of line/to last character on line.
+
+### 30 Jan 2020
+Support for selecting text with Shift and navigation keys/mouse added.
 
 LICENSE
 ===
@@ -122,3 +126,13 @@ Load81 was written by Salvatore Sanfilippo and is released under the
 BSD two-clause license, see the COPYING file for more information.
 
 The load81 project is dedicated to Jack Tramiel, founder of Commodore.
+
+TODO
+===
+
+* Hilight current line
+* Delete key handling
+* Copy, cut, paste
+* Sprite object
+* Turtle graphics
+* Sound?
